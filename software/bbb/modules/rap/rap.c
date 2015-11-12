@@ -161,7 +161,7 @@ static ssize_t debug_show(struct kobject* kobj, struct kobj_attribute* attr, cha
 
 static ssize_t debug_store(struct kobject* kobj, struct kobj_attribute* attr, const char* buf, size_t size)
 {
-    struct rap_device* rap;
+    /*struct rap_device* rap;
     uint8_t data[] = {
         0xDE, 0xAD, 0xBE, 0xEF
     };
@@ -185,7 +185,18 @@ static ssize_t debug_store(struct kobject* kobj, struct kobj_attribute* attr, co
 
     value = 0;
     len = rap_read(rap, 0xAC, &value);
-    printk(KERN_INFO "regAC = %d\n", value);
+    printk(KERN_INFO "regAC = %d\n", value);*/
+
+    struct rap_device* rap;
+    uint8_t data[] = {
+        0xDE, 0xAD, 0xBE, 0xEF
+    };
+
+    rap = kobj_rap_device(kobj);
+    if (!rap)
+        return -ENOMEM; //TODO: correct error ?
+
+    rap_write(rap, 0xAB, &data[0], sizeof(data));
 
     return size;
 }
