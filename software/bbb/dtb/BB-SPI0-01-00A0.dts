@@ -1,6 +1,6 @@
 /dts-v1/;
 /plugin/;
-/ 
+/{
     compatible = "ti,beaglebone", "ti,beaglebone-black";
     /* identification */
     part-number = "spi0pinmux";
@@ -28,8 +28,8 @@
             spidev@0 {
                 spi-max-frequency = <24000000>;
                 reg = <0>;
-                compatible = "linux,rap
+                compatible = "linux,rap";
             };
         };
     };
-
+};
