@@ -16,9 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-DEF(RAP_CMD_WRITE = 0x01)
-DEF(RAP_CMD_READ = 0x02)
-DEF(RAP_STATUS_OK = 0xF0)
-DEF(RAP_STATUS_INVALID_CMD = 0xF1) // invalid command byte
-DEF(RAP_STATUS_INVALID_REG = 0xF2) // no such register id
-DEF(RAP_STATUS_INVALID_ACC = 0xF3)  // invalid reg access (R/W issue)
+DEF(RAP_ESYNC = 1)
+DEF(RAP_ECMD = 2)
+DEF(RAP_EREG = 3)
+DEF(RAP_EACC = 4)
+DEF(RAP_ESPI = 5)

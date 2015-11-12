@@ -1,3 +1,21 @@
+/*
+ * repico/software/bbb/repico_rap
+ * Copyright (C) 2016 Alexandre Monti
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -8,6 +26,7 @@
 #include <linux/of_device.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
+#include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
 
@@ -31,6 +50,8 @@ struct rap_device
 
     struct spi_device* spi_device;
     struct list_head list;
+
+    spinlock_t lock;
 };
 
 /****************************/
@@ -54,17 +75,19 @@ static int rap_driver_remove(struct spi_device* spi);
 /*** SPI RAP primitives ***/
 /**************************/
 
+#define DEF(a) a,
 enum
 {
-    RAP_SYNC_BYTE = 0xA5,
-    RAP_CMD_WRITE = 0x01,
-    RAP_CMD_READ = 0x02
+    #include "defs/rap.def"
+    #include "defs/rap_errno.def"
 };
+#undef DEF
 
-void rap_spi_write(struct spi_device* spi, uint8_t* data, int len)
+void rap_spi_write(struct rap_device* rap, uint8_t* data, int len)
 {
     struct spi_transfer t[1];
     struct spi_message m;
+    unsigned long flags;
 
     memset(&t[0], 0, sizeof(t));
     spi_message_init(&m);
@@ -73,13 +96,16 @@ void rap_spi_write(struct spi_device* spi, uint8_t* data, int len)
     t[0].len = len;
     spi_message_add_tail(&t[0], &m);
 
-    spi_sync(spi, &m);
+    spin_lock_irqsave(&rap->lock, flags);
+    spi_sync(rap->spi_device, &m);
+    spin_unlock_irqrestore(&rap->lock, flags);
 }
 
-void rap_spi_write2(struct spi_device* spi, uint8_t* data1, int len1, uint8_t* data2, int len2)
+void rap_spi_write2(struct rap_device* rap, uint8_t* data1, int len1, uint8_t* data2, int len2)
 {
     struct spi_transfer t[2];
     struct spi_message m;
+    unsigned long flags;
 
     memset(&t[0], 0, sizeof(t));
     spi_message_init(&m);
@@ -92,13 +118,16 @@ void rap_spi_write2(struct spi_device* spi, uint8_t* data1, int len1, uint8_t* d
     t[1].len = len2;
     spi_message_add_tail(&t[1], &m);
 
-    spi_sync(spi, &m);
+    spin_lock_irqsave(&rap->lock, flags);
+    spi_sync(rap->spi_device, &m);
+    spin_unlock_irqrestore(&rap->lock, flags);
 }
 
-void rap_spi_read(struct spi_device* spi, uint8_t* data, int len)
+void rap_spi_read(struct rap_device* rap, uint8_t* data, int len)
 {
     struct spi_transfer t[1];
     struct spi_message m;
+    unsigned long flags;
 
     memset(&t[0], 0, sizeof(t));
     spi_message_init(&m);
@@ -107,10 +136,12 @@ void rap_spi_read(struct spi_device* spi, uint8_t* data, int len)
     t[0].len = len;
     spi_message_add_tail(&t[0], &m);
 
-    spi_sync(spi, &m);
+    spin_lock_irqsave(&rap->lock, flags);
+    spi_sync(rap->spi_device, &m);
+    spin_unlock_irqrestore(&rap->lock, flags);
 }
 
-void rap_write(struct rap_device* rap, uint8_t reg, void* data, uint8_t len)
+int rap_write(struct rap_device* rap, uint8_t reg, void* data, uint8_t len)
 {
     uint8_t cmd[] =
     {
@@ -121,10 +152,19 @@ void rap_write(struct rap_device* rap, uint8_t reg, void* data, uint8_t len)
     };
     uint8_t rx[4];
 
-    rap_spi_write2(rap->spi_device, &cmd[0], sizeof(cmd), data, len);
-    rap_spi_read(rap->spi_device, &rx[0], sizeof(rx));
+    rap_spi_write2(rap, &cmd[0], sizeof(cmd), data, len);
+    rap_spi_read(rap, &rx[0], sizeof(rx));
 
-    printk(KERN_INFO "Sync bytes %02X %02X %02X\n", rx[1], rx[2], rx[3]);
+    if (rx[1] != RAP_SYNC_BYTE)
+        return -RAP_ESYNC;
+    else if (rx[2] == RAP_STATUS_INVALID_CMD)
+        return -RAP_ECMD;
+    else if (rx[2] == RAP_STATUS_INVALID_REG)
+        return -RAP_EREG;
+    else if (rx[2] == RAP_STATUS_INVALID_ACC)
+        return -RAP_EACC;
+
+    return len;
 }
 
 int rap_read(struct rap_device* rap, uint8_t reg, void* data)
@@ -137,10 +177,20 @@ int rap_read(struct rap_device* rap, uint8_t reg, void* data)
     };
     uint8_t rx[4];
 
-    rap_spi_write(rap->spi_device, &cmd[0], sizeof(cmd));
-    rap_spi_read(rap->spi_device, &rx[0], sizeof(rx));
+    rap_spi_write(rap, &cmd[0], sizeof(cmd));
+    rap_spi_read(rap, &rx[0], sizeof(rx));
 
-    rap_spi_read(rap->spi_device, data, rx[3]);
+    if (rx[1] != RAP_SYNC_BYTE)
+        return -RAP_ESYNC;
+    else if (rx[2] == RAP_STATUS_INVALID_CMD)
+        return -RAP_ECMD;
+    else if (rx[2] == RAP_STATUS_INVALID_REG)
+        return -RAP_EREG;
+    else if (rx[2] == RAP_STATUS_INVALID_ACC)
+        return -RAP_EACC;
+
+    rap_spi_read(rap, data, rx[3]);
+
     return rx[3];
 }
 
@@ -161,32 +211,7 @@ static ssize_t debug_show(struct kobject* kobj, struct kobj_attribute* attr, cha
 
 static ssize_t debug_store(struct kobject* kobj, struct kobj_attribute* attr, const char* buf, size_t size)
 {
-    /*struct rap_device* rap;
-    uint8_t data[] = {
-        0xDE, 0xAD, 0xBE, 0xEF
-    };
-    uint8_t rx[256];
-    int i;
-    int value = 123456;
-
-    rap = kobj_rap_device(kobj);
-    if (!rap)
-        return -ENOMEM; //TODO: correct error ?
-
-    rap_write(rap, 0xAB, &data[0], sizeof(data));
-    int len = rap_read(rap, 0xAB, &rx[0]);
-
-    printk(KERN_INFO "Register contents :");
-    for (i = 0; i < len; ++i)
-        printk(KERN_INFO "%02X ", rx[i]);
-    printk(KERN_INFO "\n");
-
-    rap_write(rap, 0xAC, &value, sizeof(value));
-
-    value = 0;
-    len = rap_read(rap, 0xAC, &value);
-    printk(KERN_INFO "regAC = %d\n", value);*/
-
+    int err;
     struct rap_device* rap;
     uint8_t data[] = {
         0xDE, 0xAD, 0xBE, 0xEF
@@ -196,7 +221,8 @@ static ssize_t debug_store(struct kobject* kobj, struct kobj_attribute* attr, co
     if (!rap)
         return -ENOMEM; //TODO: correct error ?
 
-    rap_write(rap, 0xAB, &data[0], sizeof(data));
+    err = rap_write(rap, 0xAB, &data[0], sizeof(data));
+    printk(KERN_INFO "%d\n", err);
 
     return size;
 }
@@ -242,7 +268,7 @@ static struct spi_driver rap_driver =
 {
     .driver =
     {
-        .name = "rap",
+        .name = "repico_rap",
         .owner = THIS_MODULE,
         .of_match_table = of_match_ptr(rap_dt_ids)
     },
@@ -292,6 +318,8 @@ static int rap_driver_probe(struct spi_device* spi)
     spi_setup(spi);
     rap->spi_device = spi;
 
+    spin_lock_init(&rap->lock);
+
     // Add driver-specific data to the SPI device
     //   so we can find ourselves in driver_remove for example
     spi_set_drvdata(spi, rap);
@@ -332,8 +360,6 @@ static int __init rap_init(void)
 {
     int err;
 
-    printk(KERN_INFO "rap_init()\n");
-
     // Register device driver
     err = spi_register_driver(&rap_driver);
     if (err < 0)
@@ -348,8 +374,6 @@ static int __init rap_init(void)
 static void __exit rap_exit(void)
 {
     spi_unregister_driver(&rap_driver);
-
-    printk(KERN_INFO "rap_exit()\n");
 }
 
 module_init(rap_init);
