@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "platform.h"
-#include "systick.h"
+#include "libecu/platform.h"
+#include "libecu/systick.h"
 
 void systick_init()
 {

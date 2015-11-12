@@ -16,10 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ALOS_GPIO_H
-#define ALOS_GPIO_H
+#ifndef LIBCEU_GPIO_H
+#define LIBCEU_GPIO_H
 
-#include "platform.h"
+#include "libecu/platform.h"
 #include <stdint.h>
 
 void gpio_enable(GPIO_TypeDef* port);
@@ -47,4 +47,4 @@ void gpio_select_af(GPIO_TypeDef* port, uint8_t pin, uint8_t afno);
 uint8_t gpio_read(GPIO_TypeDef* port, uint8_t pin);
 void gpio_write(GPIO_TypeDef* port, uint8_t pin, uint8_t val);
 
-#endif // ALOS_GPIO_H
+#endif // LIBCEU_GPIO_H

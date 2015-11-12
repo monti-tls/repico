@@ -16,15 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libecu/platform.h"
-#include "libecu/pendsv.h"
+#ifndef LIBECU_SVCALL_H
+#define LIBECU_SVCALL_H
 
-void pendsv_init()
-{
-    SCB->SHP[10] = 14 << 4; // PRI_14 = 15
-}
+void svcall_init();
 
-void pendsv_trigger()
-{
-    SCB->ICSR |= 0x01 << 28; // invoke PendSV handler
-}
+#endif // LIBECU_SVCALL_H

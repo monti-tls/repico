@@ -16,7 +16,7 @@
 
 PRODUCT = eifm
 
-CC_FLAGS += -I../libecu/inc
-LD_FLAGS += -L../libecu/bin -lecu
+CC_FLAGS += -I../libecu/inc -I../librap/inc
+LD_FLAGS += -L../librap/bin -lrap -L../libecu/bin -lecu
 
-DEPENDS += libecu
+DEPENDS += libecu librap

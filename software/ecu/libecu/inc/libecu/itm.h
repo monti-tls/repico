@@ -16,9 +16,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ALOS_PLATFORM_H
-#define ALOS_PLATFORM_H
+#ifndef LIBCEU_ITM_H
+#define LIBCEU_ITM_H
 
-#include "stm32f4xx/stm32f4xx.h"
+//! Init the ITM module (sets up
+//!   SWO and ITP things)
+//! \return 0 if successful, -1 otherwise
+int itm_init();
 
-#endif // ALOS_PLATFORM_H
+//! Print some debug information to the kernel's
+//!   debug port (printf-like).
+//! \param format The printf-like format string
+void __attribute__((format(printf, 1, 2))) itm_printf(const char* fmt, ...);
+
+#endif // LIBCEU_ITM_H

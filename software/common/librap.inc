@@ -1,5 +1,5 @@
 /*
- * repico/software/ecu/libecu
+ * repico/software/common
  * Copyright (C) 2016 Alexandre Monti
  *
  * This program is free software: you can redistribute it and/or modify
@@ -16,9 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ALOS_SVCALL_H
-#define ALOS_SVCALL_H
-
-void svcall_init();
-
-#endif // ALOS_SVCALL_H
+DEF(RAP_CMD_WRITE = 0x01)
+DEF(RAP_CMD_READ = 0x02)
+DEF(RAP_STATUS_OK = 0xF0)
+DEF(RAP_STATUS_INVALID_CMD = 0xF1) // invalid command byte
+DEF(RAP_STATUS_INVALID_REG = 0xF2) // no such register id
+DEF(RAP_STATUS_INVALID_ACC = 0xF3)  // invalid reg access (R/W issue)

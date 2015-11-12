@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "platform.h"
-#include "gpio.h"
+#include "libecu/platform.h"
+#include "libecu/gpio.h"
 
 void gpio_enable(GPIO_TypeDef* port)
 {

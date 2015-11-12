@@ -124,7 +124,7 @@
  * @{
  */
 
-#include "stm32f4xx/stm32f4xx.h"
+#include "libecu/stm32f4xx/stm32f4xx.h"
 
 /**
  * @}

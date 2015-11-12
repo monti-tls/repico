@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "platform.h"
-#include "svcall.h"
+#include "libecu/platform.h"
+#include "libecu/svcall.h"
 
 void svcall_init()
 {
