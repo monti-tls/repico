@@ -56,8 +56,11 @@ struct rapdev
     struct list_head list;
 
     int enbl_gpio;
-    int reset_gpio;
-    int bootsel_gpio;
+    int nrst_gpio;
+    int boot_gpio;
+    int int0_gpio;
+    int int1_gpio;
+    int int2_gpio;
 
     spinlock_t lock;
 };
@@ -596,9 +599,10 @@ static ssize_t rapdev_debug_store(struct kobject* kobj, struct kobj_attribute* a
     if (!rap)
         return -ENOMEM; //TODO: correct error ?
 
-    gpio_set_value(rap->enbl_gpio, (size > 0) && buf[0] == '1' ? 1 : 0);
-    gpio_set_value(rap->reset_gpio, (size > 1) && buf[1] == '1' ? 1 : 0);
-    gpio_set_value(rap->bootsel_gpio, (size > 2) && buf[2] == '1' ? 1 : 0);
+    gpio_direction_output(rap->enbl_gpio, (size > 0) && buf[0] == '1' ? 1 : 0);
+
+    gpio_set_value(rap->nrst_gpio, (size > 0) && buf[1] == '1' ? 1 : 0);
+    gpio_set_value(rap->boot_gpio, (size > 0) && buf[2] == '1' ? 1 : 0);
 
     return size;
 }
@@ -702,40 +706,41 @@ static int rapdev_driver_probe(struct spi_device* spi)
         return -EINVAL;
     }
 
-    // Get GPIOs
-    rap->enbl_gpio = -1;
-    rap->reset_gpio = -1;
-    rap->bootsel_gpio = -1;
+    // Get GPIOs from DTB
 
     of_property_read_u32(dtb_node, "rap-enbl-gpio", &rap->enbl_gpio);
-    of_property_read_u32(dtb_node, "rap-reset-gpio", &rap->reset_gpio);
-    of_property_read_u32(dtb_node, "rap-bootsel-gpio", &rap->bootsel_gpio);
+    of_property_read_u32(dtb_node, "rap-nrst-gpio", &rap->nrst_gpio);
+    of_property_read_u32(dtb_node, "rap-boot-gpio", &rap->boot_gpio);
+    of_property_read_u32(dtb_node, "rap-int0-gpio", &rap->int0_gpio);
+    of_property_read_u32(dtb_node, "rap-int1-gpio", &rap->int1_gpio);
+    of_property_read_u32(dtb_node, "rap-int2-gpio", &rap->int2_gpio);
 
-    int gpio = of_get_named_gpio(dtb_node, "rap-test-gpio", 0);
-    printk(KERN_INFO "of_get_named_gpio() = %d\n", gpio);
-
-    if (rap->enbl_gpio < 0 || rap->reset_gpio < 0 || rap->bootsel_gpio < 0)
-    {
-        printk(KERN_ERR "Device tree does not define rap-{enbl,reset,bootsel}-gpios correctly\n");
-
-        if (rap->dev_name)
-            kfree(rap->dev_name);
-        kfree(rap);
-        return -EINVAL;
-    }
+    printk("%d %d %d %d %d %d\n", rap->enbl_gpio, rap->nrst_gpio, rap->boot_gpio, rap->int0_gpio, rap->int1_gpio, rap->int2_gpio);
 
     // Request GPIOs
     err = devm_gpio_request(&spi->dev, rap->enbl_gpio, "enbl");
     if (err != 0)
         printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->enbl_gpio, err);
 
-    err = devm_gpio_request(&spi->dev, rap->reset_gpio, "reset");
+    err = devm_gpio_request(&spi->dev, rap->nrst_gpio, "nrst");
     if (err != 0)
-        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->reset_gpio, err);
+        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->nrst_gpio, err);
 
-    err = devm_gpio_request(&spi->dev, rap->bootsel_gpio, "bootsel");
+    err = devm_gpio_request(&spi->dev, rap->boot_gpio, "boot");
     if (err != 0)
-        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->bootsel_gpio, err);
+        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->boot_gpio, err);
+
+    err = devm_gpio_request(&spi->dev, rap->int0_gpio, "int0");
+    if (err != 0)
+        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->int0_gpio, err);
+
+    err = devm_gpio_request(&spi->dev, rap->int1_gpio, "int1");
+    if (err != 0)
+        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->int1_gpio, err);
+
+    err = devm_gpio_request(&spi->dev, rap->int2_gpio, "int2");
+    if (err != 0)
+        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->int2_gpio, err);
 
     // Create kobject entry
     memset(&kobj_name[0], '\0', sizeof(kobj_name));
