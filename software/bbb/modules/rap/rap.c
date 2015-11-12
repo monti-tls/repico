@@ -54,88 +54,94 @@ static int rap_driver_remove(struct spi_device* spi);
 /*** SPI RAP primitives ***/
 /**************************/
 
-static void rap_spi_write(struct rap_device* rap, uint16_t word)
+enum
+{
+    RAP_SYNC_BYTE = 0xA5,
+    RAP_CMD_WRITE = 0x01,
+    RAP_CMD_READ = 0x02
+};
+
+void rap_spi_write(struct spi_device* spi, uint8_t* data, int len)
 {
     struct spi_transfer t[1];
     struct spi_message m;
 
-    memset(t, 0, sizeof(t));
+    memset(&t[0], 0, sizeof(t));
     spi_message_init(&m);
 
-    t[0].tx_buf = &word;
-    t[0].len = sizeof(uint16_t);
-    spi_message_add_tail(&t[0], &m);
-
-    // spin_lock_irqsave(&spilock, spilockflags);
-    spi_sync(rap->spi_device, &m);
-    // spin_unlock_irqrestore(&spilock, spilockflags);
-}
-
-static void rap_spi_write_buf(struct rap_device* rap, uint16_t* buf, uint16_t len)
-{
-    struct spi_transfer t[1];
-    struct spi_message m;
-
-    memset(t, 0, sizeof(t));
-    spi_message_init(&m);
-
-    t[0].tx_buf = buf;
+    t[0].tx_buf = data;
     t[0].len = len;
     spi_message_add_tail(&t[0], &m);
 
-    // spin_lock_irqsave(&spilock, spilockflags);
-    spi_sync(rap->spi_device, &m);
-    // spin_unlock_irqrestore(&spilock, spilockflags);
+    spi_sync(spi, &m);
 }
 
-static uint16_t rap_spi_read(struct rap_device* rap)
+void rap_spi_write2(struct spi_device* spi, uint8_t* data1, int len1, uint8_t* data2, int len2)
+{
+    struct spi_transfer t[2];
+    struct spi_message m;
+
+    memset(&t[0], 0, sizeof(t));
+    spi_message_init(&m);
+
+    t[0].tx_buf = data1;
+    t[0].len = len1;
+    spi_message_add_tail(&t[0], &m);
+
+    t[1].tx_buf = data2;
+    t[1].len = len2;
+    spi_message_add_tail(&t[1], &m);
+
+    spi_sync(spi, &m);
+}
+
+void rap_spi_read(struct spi_device* spi, uint8_t* data, int len)
 {
     struct spi_transfer t[1];
     struct spi_message m;
-    uint16_t rxbuf;
 
-    memset(t, 0, sizeof(t));
+    memset(&t[0], 0, sizeof(t));
     spi_message_init(&m);
 
-    t[0].rx_buf = &rxbuf;
-    t[0].len = sizeof(uint16_t);
+    t[0].rx_buf = data;
+    t[0].len = len;
     spi_message_add_tail(&t[0], &m);
 
-    // spin_lock_irqsave(&spilock, spilockflags);
-    spi_sync(rap->spi_device, &m);
-    // spin_unlock_irqrestore(&spilock, spilockflags);
-
-    return rxbuf;
+    spi_sync(spi, &m);
 }
 
-enum
+void rap_write(struct rap_device* rap, uint8_t reg, void* data, uint8_t len)
 {
-    RAP_SYNC_WORD = 0xA3C5,
-    RAP_WRITE_CMD = 0x0001
-};
+    uint8_t cmd[] =
+    {
+        RAP_SYNC_BYTE,
+        RAP_CMD_WRITE,
+        reg,
+        len
+    };
+    uint8_t rx[4];
 
-static int rap_write_reg(struct rap_device* rap, uint16_t reg, uint16_t* data, uint16_t len)
+    rap_spi_write2(rap->spi_device, &cmd[0], sizeof(cmd), data, len);
+    rap_spi_read(rap->spi_device, &rx[0], sizeof(rx));
+
+    printk(KERN_INFO "Sync bytes %02X %02X %02X\n", rx[1], rx[2], rx[3]);
+}
+
+int rap_read(struct rap_device* rap, uint8_t reg, void* data)
 {
-    uint16_t rsync;
-    int d = 100;
+    uint8_t cmd[] =
+    {
+        RAP_SYNC_BYTE,
+        RAP_CMD_READ,
+        reg
+    };
+    uint8_t rx[4];
 
-    rap_spi_write(rap, RAP_SYNC_WORD);
-    udelay(d);
-    rap_spi_write(rap, RAP_SYNC_WORD);
-    udelay(d);
-    rsync = rap_spi_read(rap);
-    udelay(d);
-    rap_spi_write(rap, RAP_WRITE_CMD);
-    udelay(d);
-    rap_spi_write(rap, reg);
-    udelay(d);
-    rap_spi_write(rap, len / 2);
-    udelay(d);
-    rap_spi_write_buf(rap, data, len);
+    rap_spi_write(rap->spi_device, &cmd[0], sizeof(cmd));
+    rap_spi_read(rap->spi_device, &rx[0], sizeof(rx));
 
-    printk(KERN_INFO "sync = 0x%04X\n", rsync);
-
-    return 0;
+    rap_spi_read(rap->spi_device, data, rx[3]);
+    return rx[3];
 }
 
 /************************/
@@ -156,18 +162,30 @@ static ssize_t debug_show(struct kobject* kobj, struct kobj_attribute* attr, cha
 static ssize_t debug_store(struct kobject* kobj, struct kobj_attribute* attr, const char* buf, size_t size)
 {
     struct rap_device* rap;
-    uint16_t data[] = {
-        0xDEAD, 0xBEEF
+    uint8_t data[] = {
+        0xDE, 0xAD, 0xBE, 0xEF
     };
+    uint8_t rx[256];
+    int i;
+    int value = 123456;
 
     rap = kobj_rap_device(kobj);
     if (!rap)
         return -ENOMEM; //TODO: correct error ?
 
-    // rap_write_reg(rap, 0x1234, &data[0], sizeof(data));
-    uint16_t b1 = spi_w8r16(rap->spi_device, 0xA1);
-    uint16_t b2 = spi_w8r16(rap->spi_device, 0xA2);
-    printk(KERN_INFO "%02X %02X\n", b1, b2);
+    rap_write(rap, 0xAB, &data[0], sizeof(data));
+    int len = rap_read(rap, 0xAB, &rx[0]);
+
+    printk(KERN_INFO "Register contents :");
+    for (i = 0; i < len; ++i)
+        printk(KERN_INFO "%02X ", rx[i]);
+    printk(KERN_INFO "\n");
+
+    rap_write(rap, 0xAC, &value, sizeof(value));
+
+    value = 0;
+    len = rap_read(rap, 0xAC, &value);
+    printk(KERN_INFO "regAC = %d\n", value);
 
     return size;
 }
@@ -259,7 +277,7 @@ static int rap_driver_probe(struct spi_device* spi)
     // Initialize the SPI device
     spi->mode = SPI_MODE_1;
     spi->bits_per_word = 8;
-    // spi->max_speed_hz = 50000;
+    spi->max_speed_hz = 50000;
     spi_setup(spi);
     rap->spi_device = spi;
 
