@@ -49,7 +49,6 @@ struct rapdev
 
     struct kobject* kobj;
     struct attribute_group kobj_attr_group;
-    uint8_t regval;
 
     struct spi_device* spi_device;
     struct list_head list;
@@ -77,8 +76,8 @@ static int rapdev_read_reg(struct rapdev* rap, uint8_t reg, void* data);
 static int rapdev_genl_list_devices(struct sk_buff* skb, struct genl_info* info);
 static int rapdev_genl_write_reg(struct sk_buff* skb, struct genl_info* info);
 static int rapdev_genl_read_reg(struct sk_buff* skb, struct genl_info* info);
-static ssize_t debug_show(struct kobject* kobj, struct kobj_attribute* attr, char* buf);
-static ssize_t debug_store(struct kobject* kobj, struct kobj_attribute* attr, const char* buf, size_t size);
+static ssize_t rapdev_debug_show(struct kobject* kobj, struct kobj_attribute* attr, char* buf);
+static ssize_t rapdev_debug_store(struct kobject* kobj, struct kobj_attribute* attr, const char* buf, size_t size);
 static struct rapdev* rapdev_get_kobj(struct kobject* kobj);
 static int rapdev_driver_probe(struct spi_device* spi);
 static int rapdev_driver_remove(struct spi_device* spi);
@@ -572,7 +571,7 @@ static struct genl_ops rapdev_genl_ops[] =
 /*** kobject bindings ***/
 /************************/
 
-static ssize_t debug_show(struct kobject* kobj, struct kobj_attribute* attr, char* buf)
+static ssize_t rapdev_debug_show(struct kobject* kobj, struct kobj_attribute* attr, char* buf)
 {
     struct rapdev* rap;
 
@@ -580,32 +579,19 @@ static ssize_t debug_show(struct kobject* kobj, struct kobj_attribute* attr, cha
     if (!rap)
         return -ENOMEM; //TODO: correct error ?
     
-    return sprintf(buf, "0x%02X\n", rap->regval);
+    return sprintf(buf, "RAP device id #%d\n", rap->dev_id);
 }
 
-static ssize_t debug_store(struct kobject* kobj, struct kobj_attribute* attr, const char* buf, size_t size)
+static ssize_t rapdev_debug_store(struct kobject* kobj, struct kobj_attribute* attr, const char* buf, size_t size)
 {
-    int err;
-    struct rapdev* rap;
-    uint8_t data[] = {
-        0xDE, 0xAD, 0xBE, 0xEF
-    };
-
-    rap = rapdev_get_kobj(kobj);
-    if (!rap)
-        return -ENOMEM; //TODO: correct error ?
-
-    err = rapdev_write_reg(rap, 0xAB, &data[0], sizeof(data));
-    printk(KERN_INFO "%d\n", err);
-
     return size;
 }
 
-static struct kobj_attribute debug_attr = __ATTR(debug, 0666, debug_show, debug_store);
+static struct kobj_attribute rapdev_debug_attr = __ATTR(debug, 0666, rapdev_debug_show, rapdev_debug_store);
 
 static struct attribute* rapdev_kobj_attrs[] =
 {
-    &debug_attr.attr,
+    &rapdev_debug_attr.attr,
     0
 };
 
@@ -661,13 +647,14 @@ static int rapdev_driver_probe(struct spi_device* spi)
     if (!rap)
         return -ENOMEM;
 
-
+    // Get new device id
     mutex_lock(&rapdev_lock);
     rap->dev_id = rapdev_next_devid++;
     mutex_unlock(&rapdev_lock);
-    snprintf(&kobj_name[0], sizeof(kobj_name), "rapdev%d\n", rap->dev_id);
 
     // Create kobject entry
+    memset(&kobj_name[0], '\0', sizeof(kobj_name));
+    snprintf(&kobj_name[0], sizeof(kobj_name), "rapdev%d", rap->dev_id);
     rap->kobj = kobject_create_and_add(&kobj_name[0], kernel_kobj);
     if (!rap->kobj)
     {
