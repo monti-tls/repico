@@ -24,6 +24,7 @@
 #include <linux/spi/spi.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_gpio.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
@@ -45,6 +46,7 @@ MODULE_VERSION("");
 
 struct rapdev
 {
+    char* dev_name;
     uint32_t dev_id;
 
     struct kobject* kobj;
@@ -52,6 +54,10 @@ struct rapdev
 
     struct spi_device* spi_device;
     struct list_head list;
+
+    int enbl_gpio;
+    int reset_gpio;
+    int bootsel_gpio;
 
     spinlock_t lock;
 };
@@ -579,11 +585,21 @@ static ssize_t rapdev_debug_show(struct kobject* kobj, struct kobj_attribute* at
     if (!rap)
         return -ENOMEM; //TODO: correct error ?
     
-    return sprintf(buf, "RAP device id #%d\n", rap->dev_id);
+    return sprintf(buf, "RAP device \"%s\"\n  .dev_id = %d\n", rap->dev_name, rap->dev_id);
 }
 
 static ssize_t rapdev_debug_store(struct kobject* kobj, struct kobj_attribute* attr, const char* buf, size_t size)
 {
+    struct rapdev* rap;
+
+    rap = rapdev_get_kobj(kobj);
+    if (!rap)
+        return -ENOMEM; //TODO: correct error ?
+
+    gpio_set_value(rap->enbl_gpio, (size > 0) && buf[0] == '1' ? 1 : 0);
+    gpio_set_value(rap->reset_gpio, (size > 1) && buf[1] == '1' ? 1 : 0);
+    gpio_set_value(rap->bootsel_gpio, (size > 2) && buf[2] == '1' ? 1 : 0);
+
     return size;
 }
 
@@ -641,6 +657,9 @@ static int rapdev_driver_probe(struct spi_device* spi)
     int err;
     struct rapdev* rap;
     char kobj_name[256];
+    struct device_node* dtb_node;
+    int name_len;
+    const char* name;
 
     // Allocate memory for the device object
     rap = kzalloc(sizeof(struct rapdev), GFP_KERNEL);
@@ -651,6 +670,72 @@ static int rapdev_driver_probe(struct spi_device* spi)
     mutex_lock(&rapdev_lock);
     rap->dev_id = rapdev_next_devid++;
     mutex_unlock(&rapdev_lock);
+
+    // Initialize the SPI device
+    spi->mode = SPI_MODE_1;
+    spi->bits_per_word = 8;
+    spi->max_speed_hz = 50000;
+    spi_setup(spi);
+    rap->spi_device = spi;
+
+    spin_lock_init(&rap->lock);
+
+    // Add driver-specific data to the SPI device
+    //   so we can find ourselves in driver_remove for example
+    spi_set_drvdata(spi, rap);
+
+    // Get DTB node from platform driver
+    dtb_node = spi->dev.of_node;
+
+    // Get RAP device name
+    name_len = 0;
+    name = of_get_property(dtb_node, "rap-devname", &name_len);
+    if (name && name_len)
+    {
+        rap->dev_name = kzalloc(name_len + 1, GFP_KERNEL);
+        strcpy(rap->dev_name, name);
+    }
+    else
+    {
+        printk(KERN_ERR "Device tree does not define rap-devname property\n");
+        kfree(rap);
+        return -EINVAL;
+    }
+
+    // Get GPIOs
+    rap->enbl_gpio = -1;
+    rap->reset_gpio = -1;
+    rap->bootsel_gpio = -1;
+
+    of_property_read_u32(dtb_node, "rap-enbl-gpio", &rap->enbl_gpio);
+    of_property_read_u32(dtb_node, "rap-reset-gpio", &rap->reset_gpio);
+    of_property_read_u32(dtb_node, "rap-bootsel-gpio", &rap->bootsel_gpio);
+
+    int gpio = of_get_named_gpio(dtb_node, "rap-test-gpio", 0);
+    printk(KERN_INFO "of_get_named_gpio() = %d\n", gpio);
+
+    if (rap->enbl_gpio < 0 || rap->reset_gpio < 0 || rap->bootsel_gpio < 0)
+    {
+        printk(KERN_ERR "Device tree does not define rap-{enbl,reset,bootsel}-gpios correctly\n");
+
+        if (rap->dev_name)
+            kfree(rap->dev_name);
+        kfree(rap);
+        return -EINVAL;
+    }
+
+    // Request GPIOs
+    err = devm_gpio_request(&spi->dev, rap->enbl_gpio, "enbl");
+    if (err != 0)
+        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->enbl_gpio, err);
+
+    err = devm_gpio_request(&spi->dev, rap->reset_gpio, "reset");
+    if (err != 0)
+        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->reset_gpio, err);
+
+    err = devm_gpio_request(&spi->dev, rap->bootsel_gpio, "bootsel");
+    if (err != 0)
+        printk(KERN_ERR "devm_gpio_request(%d) = %d\n", rap->bootsel_gpio, err);
 
     // Create kobject entry
     memset(&kobj_name[0], '\0', sizeof(kobj_name));
@@ -676,19 +761,6 @@ static int rapdev_driver_probe(struct spi_device* spi)
         kfree(rap);
         return err;
     }
-
-    // Initialize the SPI device
-    spi->mode = SPI_MODE_1;
-    spi->bits_per_word = 8;
-    spi->max_speed_hz = 50000;
-    spi_setup(spi);
-    rap->spi_device = spi;
-
-    spin_lock_init(&rap->lock);
-
-    // Add driver-specific data to the SPI device
-    //   so we can find ourselves in driver_remove for example
-    spi_set_drvdata(spi, rap);
 
     // Add the RAP device in our device list
     INIT_LIST_HEAD(&rap->list);
