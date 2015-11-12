@@ -30,20 +30,20 @@ int main()
     spi_enable(SPI2);
 
     // DFF = 0 (8 bit frames)
-    SPI2->CR1 |= (0x01 << 11);
+    SPI2->CR1 &= ~(0x01 << 11);
 
     // CPOL = 0 (SCK 0 when idle)
     SPI2->CR1 &= ~(0x01 << 1);
-    // CPHA = 1 (second clock transition is first data capture)
-    SPI2->CR1 &= ~(0x01 << 0);
+    // CPHA = 0 (first clock transition is first data capture)
+    SPI2->CR1 |= (0x01 << 0);
 
     // LSBFIRST = 0
     SPI2->CR1 &= ~(0x01 << 7);
 
     // SSM = 0 (hardware NSS)
-    SPI2->CR1 |= (0x01 << 9);
+    SPI2->CR1 &= ~(0x01 << 9);
     // SSI = 0 (slave enabled)
-    SPI2->CR1 &= ~(0x01 << 8);
+    // SPI2->CR1 &= ~(0x01 << 8);
 
     // MSTR = 0 (slave mode)
     SPI2->CR1 &= ~(0x01 << 2);
@@ -54,22 +54,23 @@ int main()
     // TXEIE = 0
     SPI2->CR2 &= ~(0x01 << 7);
     // RXNEIE = 1
-    SPI2->CR2 |= (0x01 << 6);
+    SPI2->CR2 &= ~(0x01 << 6);
     // ERRIE = 1
-    SPI2->CR2 |= (0x01 << 5);
+    SPI2->CR2 &= ~(0x01 << 5);
 
     // SPI2 is interrupt #36
     NVIC->ISER[1] |= (0x01 << 4);
     // Set max priority
     NVIC->IP[36] = (0 << 4);
 
-    // SPI2->DR = 0x13;
-
     // Enable GPIOs
     gpio_enable(GPIOB);
     gpio_enable(GPIOC);
     
     // Configure GPIOs to AF5
+    gpio_init_af(GPIOB, 12);
+    gpio_select_af(GPIOB, 12, 5);
+
     gpio_init_af(GPIOB, 10);
     gpio_select_af(GPIOB, 10, 5);
     
@@ -78,6 +79,37 @@ int main()
     
     gpio_init_af(GPIOC, 3);
     gpio_select_af(GPIOC, 3, 5);
+
+    uint8_t tx[] = { 0xF1, 0xF2, 0xF3 };
+    uint8_t rx[sizeof(tx)];
+    int ptx = 0;
+    int prx = 0;
+
+    for (;;)
+    {
+        SPI2->DR = tx[ptx++];
+        
+        while (ptx < sizeof(tx))
+        {
+            while (!(SPI2->SR & 2));
+            SPI2->DR = tx[ptx++];
+            while (!(SPI2->SR & 1));
+            rx[prx++] = SPI2->DR;
+        }
+
+        while (!(SPI2->SR & 1));
+            rx[prx++] = SPI2->DR;
+
+        while (!(SPI2->SR & 2));
+        while ((SPI2->SR & (1 << 7)));
+
+        for (int i = 0; i < sizeof(tx); ++i)
+            itm_printf("%02X ", rx[i]);
+        itm_printf("\n");
+
+        ptx = 0;
+        prx = 0;
+    }
 
     for (;;);
 }
@@ -91,13 +123,15 @@ enum
 
 enum
 {
-    SYNC_RCVE,
+    SYNC_RCVE1,
+    SYNC_RCVE2,
     SYNC_SEND,
     SYNCED,
     COMMAND
-} rap_state = SYNC_RCVE;
+} rap_state = SYNC_RCVE1;
 
 uint16_t rap_command = RAP_NONE;
+uint16_t rap_sync = 0x0000;
 
 struct
 {
@@ -125,62 +159,22 @@ void irq_spi2_handler()
     {
         itm_printf("Error: 0x%08X\n", sr);
 
-        rap_state = SYNC_RCVE;
+        rap_state = SYNC_RCVE1;
 
         // Clear error flag using this software sequence
-        volatile uint8_t dr = SPI2->DR;
+        volatile __attribute__((unused)) uint8_t dr = SPI2->DR;
         sr = SPI2->SR;
         return;
     }
-    else if (sr & (0x01 << 0)) // RXNE == 1
+    
+    if (sr & (0x01 << 0)) // RXNE == 1
     {
         volatile uint16_t dr = SPI2->DR;
 
-        itm_printf("%04X\n", dr);
-
-        switch (rap_state)
-        {
-            case SYNC_RCVE:
-                SPI2->DR = dr;
-                rap_state = SYNC_SEND;
-                break;
-
-            case SYNC_SEND:
-                SPI2->DR = 0x00;
-                rap_state = SYNCED;
-                break;
-
-            case SYNCED:
-                rap_command = dr;
-                rap_state = COMMAND;
-                rap_write_cmd.state = WRITE_GET_REG_ID;
-                break;
-
-            case COMMAND:
-                if (rap_command == RAP_WRITE)
-                {
-                    if (rap_write_cmd.state == WRITE_GET_REG_ID)
-                    {
-                        rap_write_cmd.reg_id = dr;
-                        rap_write_cmd.state = WRITE_GET_REG_SIZE;
-                    }
-                    else if (rap_write_cmd.state == WRITE_GET_REG_SIZE)
-                    {
-                        rap_write_cmd.size = dr;
-                        rap_write_cmd.state = WRITE_GET_REG_DATA;
-                        rap_write_cmd.pos = 0;
-                    }
-                    else if (rap_write_cmd.state == WRITE_GET_REG_DATA)
-                    {
-                        rap_write_cmd.data[rap_write_cmd.pos++] = dr;
-                        if (rap_write_cmd.pos >= rap_write_cmd.size)
-                        {
-                            rap_state = SYNC_RCVE;
-                            itm_printf("Write register %04X with %04X bytes\n", rap_write_cmd.reg_id, rap_write_cmd.size);
-                        }
-                    }
-                }
-                break;
-        }
+        // itm_printf("%04X\n", dr);
+    }
+    else if (sr & (0x01 << 1)) // TXNE == 1
+    {
+        SPI2->DR = 0x1001;
     }
 }
