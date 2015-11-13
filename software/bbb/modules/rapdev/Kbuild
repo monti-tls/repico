@@ -1,4 +1,4 @@
-# repico/software/bbb/repico_rap
+# repico/software/bbb/rapdev
 # Copyright (C) 2016 Alexandre Monti
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,18 +14,5 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-ifneq ($(KERNELRELEASE),)
-# kbuild part of makefile
-include Kbuild
-
-else
-# normal makefile
-KDIR ?= /lib/modules/`uname -r`/build
-
-all:
-	@$(MAKE) --no-print-directory -C $(KDIR) M=$$PWD modules
-
-clean:
-	@$(MAKE) --no-print-directory -C $(KDIR) M=$$PWD clean
-
-endif
+obj-m := rapdev.o
+ccflags-y := -I$(src)/../../../common

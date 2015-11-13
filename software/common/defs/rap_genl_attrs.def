@@ -16,13 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-DEF(RAP_ESYNC   = 1)  // [SPI]    Invalid sync. byte
-DEF(RAP_ECMD    = 2)  // [SPI]    Invalid command
-DEF(RAP_EREG    = 3)  // [SPI]    Invalid register identifier
-DEF(RAP_EACC    = 4)  // [SPI]    Bad register access
-DEF(RAP_EID     = 5)  // [SPIDEV] Invalid RAP device id
-DEF(RAP_EPACKET = 6)  // [SPIDEV] Invalid RAP Netlink packet
-DEF(RAP_EINVAL  = 7)  // [LIBRAP] Invalid argument
-DEF(RAP_ENOMEM  = 8)  // [LIBRAP] Memory allocation error
-DEF(RAP_ENL     = 9)  // [LIBRAP] Netlink error
-DEF(RAP_EOVF    = 10) // [LIBRAP] Read overflow
+DEF(RAP_GENL_ATTR_ERRNO,     NLA_U32)
+DEF(RAP_GENL_ATTR_CMD,       NLA_U32)
+DEF(RAP_GENL_ATTR_DEV_COUNT, NLA_U32)
+DEF(RAP_GENL_ATTR_DEV_IDS,   NLA_BINARY)
+DEF(RAP_GENL_ATTR_DEV_ID,    NLA_U32)
+DEF(RAP_GENL_ATTR_REG_ID,    NLA_U8)
+DEF(RAP_GENL_ATTR_REG_SIZE,  NLA_U8)
+DEF(RAP_GENL_ATTR_REG_DATA,  NLA_BINARY)
