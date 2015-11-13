@@ -1,0 +1,10 @@
+**********************************
+* Copyright:                     *
+*   Thomatronik GmbH, Germany    *
+*   info@thomatronik.de          *
+**********************************
+*   PSPICE
+.model s1d d is = 8.32251E-009 n = 1.99965 rs = 0.025105
++ eg = 1.11 xti = 3 t_measured = 27
++ cjo = 4.21954E-011 vj = 0.7 m = 0.550771 fc = 0.5
++ tt = 4.43935E-006 bv = 220 ibv = 10 af = 1 kf = 0
