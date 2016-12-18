@@ -24,7 +24,7 @@
 #define DEF(a) a,
 enum
 {
-    #include "librap.inc"
+    #include "defs/rap_spi.def"
 };
 #undef DEF
 
