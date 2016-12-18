@@ -1,4 +1,4 @@
-# repico/software/ecu
+# repico/software/ecu/libecu
 # Copyright (C) 2016 Alexandre Monti
 #
 # This program is free software: you can redistribute it and/or modify

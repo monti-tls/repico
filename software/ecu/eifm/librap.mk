@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-.PHONY: libecu-all
-libecu-all:
-	@make --no-print-directory -C ../libecu
+.PHONY: librap-all
+librap-all:
+	@make --no-print-directory -C ../librap
 
-.PHONY: libecu-clean
-libecu-clean:
-	@make --no-print-directory clean -C ../libecu
+.PHONY: librap-clean
+librap-clean:
+	@make --no-print-directory clean -C ../librap

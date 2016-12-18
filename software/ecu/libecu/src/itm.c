@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "platform.h"
-#include "itm.h"
+#include "libecu/platform.h"
+#include "libecu/itm.h"
 
 #include <stdarg.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-# repico/software/ecu
+# repico/software/ecu/libecu
 # Copyright (C) 2016 Alexandre Monti
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-.PHONY: libecu-all
-libecu-all:
-	@make --no-print-directory -C ../libecu
+STATIC_LIBRARY = yes
+PRODUCT = librap
 
-.PHONY: libecu-clean
-libecu-clean:
-	@make --no-print-directory clean -C ../libecu
+CC_FLAGS += -I../libecu/inc
+LD_FLAGS += -L../libecu/bin -lecu
+
+DEPENDS += libecu

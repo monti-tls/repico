@@ -48,6 +48,7 @@ CC_FLAGS += -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork
 CC_FLAGS += -mfloat-abi=soft
 CC_FLAGS += $(DEFINES)
 CC_FLAGS += -I$(INC_DIR) -I$(SRC_DIR)
+CC_FLAGS += -I../../common
 
 # Mandatory AS flags
 CC_FLAGS += $(DEFINES)

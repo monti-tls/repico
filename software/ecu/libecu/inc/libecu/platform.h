@@ -16,11 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ALOS_SYSTICK_H
-#define ALOS_SYSTICK_H
+#ifndef LIBECU_PLATFORM_H
+#define LIBECU_PLATFORM_H
 
-void systick_init();
-void systick_start();
-void systick_stop();
+#include "stm32f4xx/stm32f4xx.h"
 
-#endif // ALOS_SYSTICK_H
+#endif // LIBECU_PLATFORM_H

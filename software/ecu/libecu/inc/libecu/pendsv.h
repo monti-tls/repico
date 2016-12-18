@@ -16,17 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ALOS_KPRINT_H
-#define ALOS_KPRINT_H
+#ifndef LIBCEU_PENDSV_H
+#define LIBCEU_PENDSV_H
 
-//! Init the ITM module (sets up
-//!   SWO and ITP things)
-//! \return 0 if successful, -1 otherwise
-int itm_init();
+void pendsv_init();
+void pendsv_trigger();
 
-//! Print some debug information to the kernel's
-//!   debug port (printf-like).
-//! \param format The printf-like format string
-void __attribute__((format(printf, 1, 2))) itm_printf(const char* fmt, ...);
-
-#endif // ALOS_KPRINT_H
+#endif // LIBCEU_PENDSV_H

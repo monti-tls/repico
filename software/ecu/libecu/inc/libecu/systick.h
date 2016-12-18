@@ -16,15 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libecu/platform.h"
-#include "libecu/pendsv.h"
+#ifndef LIBECU_SYSTICK_H
+#define LIBECU_SYSTICK_H
 
-void pendsv_init()
-{
-    SCB->SHP[10] = 14 << 4; // PRI_14 = 15
-}
+void systick_init();
+void systick_start();
+void systick_stop();
 
-void pendsv_trigger()
-{
-    SCB->ICSR |= 0x01 << 28; // invoke PendSV handler
-}
+#endif // LIBECU_SYSTICK_H

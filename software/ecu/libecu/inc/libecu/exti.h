@@ -16,10 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ALOS_PENDSV_H
-#define ALOS_PENDSV_H
+#ifndef LIBCEU_EXTI_H
+#define LIBCEU_EXTI_H
 
-void pendsv_init();
-void pendsv_trigger();
+#include "libecu/platform.h"
+#include <stdint.h>
 
-#endif // ALOS_PENDSV_H
+void exti_init(GPIO_TypeDef* port, uint8_t pin, uint8_t priority, uint8_t edge);
+uint8_t exti_read(uint8_t line);
+void exti_clear(uint8_t line);
+
+#endif // LIBCEU_EXTI_H
