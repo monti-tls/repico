@@ -1,0 +1,8 @@
+************************************************** *****************
+* Model name : BAT60JFILM
+* Description : Small Signal Schottky Diode
+* Package type : SOD-323
+************************************************** *****************
+.MODEL BAT60JFILM D IS=20.053E-9 N=.93972 RS=.18722 IKF=614.92 CJO=101.96E-12
++ M=.39267 VJ=.3905 ISR=650.19E-9 NR=4.9950 EG=.69 XTI=2 FC=0.5 TT=0
+*$
