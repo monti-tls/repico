@@ -1,0 +1,47 @@
+/dts-v1/;
+/plugin/;
+/{
+    // See http://kilobaser.com/blog/2014-07-28-beaglebone-black-devicetreeoverlay-generator
+
+    compatible = "ti,beaglebone", "ti,beaglebone-black";
+    part-number = "rap0";
+    fragment@0 {
+        target = <&am33xx_pinmux>;
+        __overlay__ {
+            spi0_pins_s0: spi0_pins_s0 {
+                pinctrl-single,pins = <
+                    0x150 0x30 /* spi0_sclk, INPUT_PULLUP | MODE0 */
+                    0x154 0x30 /* spi0_d0, INPUT_PULLUP | MODE0 */
+                    0x158 0x10 /* spi0_d1, OUTPUT_PULLUP | MODE0 */
+                    0x15c 0x10 /* spi0_cs0, OUTPUT_PULLUP | MODE0 */
+                    0x054 0x7  /* gpio1_21, OUTPUT_PULLDOWN | MODE7 */
+                    0x058 0x7  /* gpio1_22, OUTPUT_PULLDOWN | MODE7 */
+                    0x05c 0x7  /* gpio1_23, OUTPUT_PULLDOWN | MODE7 */
+                >;
+            };
+        };
+    };
+    fragment@1 {
+        target = <&spi0>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            status = "okay";
+            pinctrl-names = "default";
+            pinctrl-0 = <&spi0_pins_s0>;
+            spidev@0 {
+                // SPI settings
+                spi-max-frequency = <24000000>;
+                reg = <0>;
+                // RAP settings
+                rap-devname = "dda";
+                rap-enbl-gpio = <53>;
+                rap-reset-gpio = <54>;
+                rap-bootsel-gpio = <55>;
+                rap-test-gpio = <&gpio1 ??? 0>;
+                // Driver
+                compatible = "linux,rapdev";
+            };
+        };
+    };
+};
